@@ -14,14 +14,64 @@ package {
 		private var tetromino: Sprite;					// DisplayObject тетромино
 		private var currentTetromino: uint;				// число тетромино в игре (от 0 до 6)
 		private var currentRotation: uint;				// вращение тетромино (от 0 до 3)
-		private var tRow: uint;							// вертикальное положение тетромино
-		private var tCol: uint;							// горизонтальное положение тетромино
+		private var tRow: int;							// вертикальное положение тетромино
+		private var tCol: int;							// горизонтальное положение тетромино
 		
 		public function Main() 
 		{
 			generateField();   					// рисуем поле
 			initTetrominoes();					// инициализируем массивы, связанные с тетромино
 			generateTetromino();				// генерируем случайное тетромино на поле
+			stage.addEventListener(KeyboardEvent.KEY_DOWN, onKDown);	// слушатель клавиатуры
+		}
+		
+		private function onKDown(event:KeyboardEvent):void
+		{
+			switch (event.keyCode) 
+			{
+				case 37 :
+					if (canFit(tRow, tCol - 1))	// проверяем, может ли тетромино поместиться в заданное положение или нет 
+					{
+						tCol--;
+						placeTetromino();
+					}
+					break;
+				case 39 :
+					if (canFit(tRow, tCol + 1)) 
+					{
+						tCol++;
+						placeTetromino();
+					}
+					break;
+			}
+		}
+		
+		private function canFit(row:int, col:int):Boolean	// может ли тетромино поместиться в новом положении
+		{
+			var ct: uint = currentTetromino;
+			
+			// циклами проверяем текущее положение тетромино
+			for (var i: int = 0; i < tetrominoes[ct][currentRotation].length; i++) 
+			{
+				for (var j: int = 0; j < tetrominoes[ct][currentRotation][i].length; j++) 
+				{
+					// проверка того, чтобы тетромино было полностью внутри игрового поля
+					if (tetrominoes[ct][currentRotation][i][j] == 1) 
+					{
+						// граница слева
+						if (col + j < 0) 
+						{
+							return false;
+						}
+						// граница справа
+						if (col + j > 9) 
+						{
+							return false;
+						}
+					}
+				}
+			}
+			return true;
 		}
 		
 		private function generateTetromino():void				// генерируем случайное тетромино на поле
