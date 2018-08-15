@@ -30,33 +30,123 @@ package {
 			switch (event.keyCode) 
 			{
 				case 37 :
-					if (canFit(tRow, tCol - 1))	// проверяем, может ли тетромино поместиться в заданное положение или нет 
+					if (canFit(tRow, tCol - 1, currentRotation))	// проверяем, может ли тетромино поместиться в заданное положение или нет 
 					{
 						tCol--;
 						placeTetromino();
 					}
 					break;
+				case 38 :
+					var ct: uint = currentRotation;
+					var rot: uint = (ct + 1) % tetrominoes[currentTetromino].length;	// вращение тетромино
+					
+					// проверяем текущую позицию при вращении, нарушает ли она границы
+					if (canFit(tRow, tCol, rot)) 
+					{
+						currentRotation = rot;		// если все ок, принимает текущее вращение
+						removeChild(tetromino);		// текущее тетромино удаляем
+						drawTetromino();			// рисуем тетромино в новом вращении, которое приняли
+						placeTetromino();			// размещаем его на сцене
+					}
+					break;
 				case 39 :
-					if (canFit(tRow, tCol + 1)) 
+					if (canFit(tRow, tCol + 1, currentRotation)) 
 					{
 						tCol++;
 						placeTetromino();
 					}
 					break;
+				case 40 :
+					if (canFit(tRow + 1, tCol, currentRotation)) 
+					{
+						tRow++;
+						placeTetromino();
+					}
+					else						// если вниз больше двигаться некуда 
+					{
+						landTetromino();		// считаем тетромино посаженным
+						generateTetromino();	// генерируем новый тетромино
+					}
+					break;
+				
+				//case 38 :
+					//if (canFit(tRow - 1, tCol)) 
+					//{
+						//tRow--;
+						//placeTetromino();
+					//}
+					//break;
 			}
 		}
 		
-		private function canFit(row:int, col:int):Boolean	// может ли тетромино поместиться в новом положении
+		private function landTetromino():void		// когда тетромино садится на свое место, по сути перерисовываем его
 		{
 			var ct: uint = currentTetromino;
+			var landed: Sprite;
 			
-			// циклами проверяем текущее положение тетромино
+			// циклами ищем частички тетромино (каждую из четырех)
 			for (var i: int = 0; i < tetrominoes[ct][currentRotation].length; i++) 
 			{
 				for (var j: int = 0; j < tetrominoes[ct][currentRotation][i].length; j++) 
 				{
+					if (tetrominoes[ct][currentRotation][i][j] == 1)		// если нашли, то рисуем ее 
+					{
+						landed = new Sprite;
+						addChild(landed);
+						landed.graphics.lineStyle(0, 0x000000);
+						landed.graphics.beginFill(colors[currentTetromino]);
+						landed.graphics.drawRect(TS * (tCol + j), TS * (tRow + i), TS, TS);
+						landed.graphics.endFill();
+						landed.name = "r" + (tRow + i) + "c" + (tCol + j);		// имя части посаженого тетромино(часть в пятом столбце третьей строки будет r3c5)
+						fieldArray[tRow + i][tCol + j] = 1;					// рисуем квадрат, где лежит тетромино
+					}
+				}	
+			}
+			removeChild(tetromino);				// обновляем массив
+			checkForLines();					// проверяем завершенные линии
+		}
+		
+		private function checkForLines():void
+		{
+			for (var i: int = 0; i < 20; i++)					// перебираем все строки игрового поля 
+			{
+				if (fieldArray[i].indexOf(0) == -1)				// завершенная строка должна быть полностью заполнена кусками тетромино, массив должен быть заполнен на 1, то есть не может быть никакого 0. 
+				{
+					for (var j: int = 0; j < 10; j++) 			// если строка завершена, перебираем все ее десять столбцов, чтобы удалить
+					{
+						fieldArray[i][j] = 0;					// очищаем ячейки 
+						removeChild(getChildByName("r" + i + "c" + j));	// удаляем соответствующий DisplayObject, определяем его по названию.
+					}
+					
+					// ищем все строки, выше удаленной строки i. Сместим их на одну вниз
+					for (j = i; j >= 0; j--) 
+					{
+						for (var k: int = 0; k < 10; k++) 
+						{
+							if (fieldArray[j][k] == 1)			// есть ли тетрамино в k-м столбце первой j строки
+							{
+								fieldArray[j][k] = 0;			// устанавливаем k-й столбец j-й строки в 0
+								fieldArray[j+1][k] = 1;			// устанавливаем k-й столбец (j+1)-й строки в 1. Таким образом мы перемещаемся по всей строке
+								getChildByName("r" + j + "c" + k).y += TS;						// перемещаем соответствующий DisplayObject по TS ячейкам поля
+								getChildByName("r" + j + "c" + k).name = "r" + (j + 1) + "c" + k;	// изменяем соответствующее имя DisplayObject в соответствии с его новой позицией
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		private function canFit(row:int, col:int, side:uint):Boolean	// может ли тетромино поместиться в новом положении
+		{
+			var ct: uint = currentTetromino;
+			
+			// циклами проверяем текущее положение тетромино
+			for (var i: int = 0; i < tetrominoes[ct][side].length; i++) 
+			{
+				for (var j: int = 0; j < tetrominoes[ct][side][i].length; j++) 
+				{
 					// проверка того, чтобы тетромино было полностью внутри игрового поля
-					if (tetrominoes[ct][currentRotation][i][j] == 1) 
+					if (tetrominoes[ct][side][i][j] == 1) 
 					{
 						// граница слева
 						if (col + j < 0) 
@@ -65,6 +155,21 @@ package {
 						}
 						// граница справа
 						if (col + j > 9) 
+						{
+							return false;
+						}
+						// нижняя граница
+						if (row + i > 19) 
+						{
+							return false;
+						}
+						//if (row + i < 0)  // для движения вверх
+						//{
+							//return false;
+						//}
+						
+						// если на этом месте уже есть другое тетромино
+						if (fieldArray[row + i][col + j] == 1) 
 						{
 							return false;
 						}
