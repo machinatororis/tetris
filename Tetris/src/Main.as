@@ -13,69 +13,76 @@ package {
 		private var colors: Array = new Array();  		// цвета тетромино
 		private var tetromino: Sprite;					// DisplayObject тетромино
 		private var currentTetromino: uint;				// число тетромино в игре (от 0 до 6)
+		private var nextTetromino: uint;				// какое тетромино будет следующим
 		private var currentRotation: uint;				// вращение тетромино (от 0 до 3)
 		private var tRow: int;							// вертикальное положение тетромино
 		private var tCol: int;							// горизонтальное положение тетромино
+		private var timeCount: Timer = new Timer(500);	// будет запускать слушатель событий каждые 500 миллисекунд
+		private var gameOver: Boolean = false;			// игра окончена или нет
 		
 		public function Main() 
 		{
 			generateField();   					// рисуем поле
 			initTetrominoes();					// инициализируем массивы, связанные с тетромино
+			nextTetromino = Math.floor(Math.random() * 7); // генерируем следующее тетромино
 			generateTetromino();				// генерируем случайное тетромино на поле
 			stage.addEventListener(KeyboardEvent.KEY_DOWN, onKDown);	// слушатель клавиатуры
 		}
 		
 		private function onKDown(event:KeyboardEvent):void
 		{
-			switch (event.keyCode) 
+			if(! gameOver)
 			{
-				case 37 :
-					if (canFit(tRow, tCol - 1, currentRotation))	// проверяем, может ли тетромино поместиться в заданное положение или нет 
-					{
-						tCol--;
-						placeTetromino();
-					}
-					break;
-				case 38 :
-					var ct: uint = currentRotation;
-					var rot: uint = (ct + 1) % tetrominoes[currentTetromino].length;	// вращение тетромино
-					
-					// проверяем текущую позицию при вращении, нарушает ли она границы
-					if (canFit(tRow, tCol, rot)) 
-					{
-						currentRotation = rot;		// если все ок, принимает текущее вращение
-						removeChild(tetromino);		// текущее тетромино удаляем
-						drawTetromino();			// рисуем тетромино в новом вращении, которое приняли
-						placeTetromino();			// размещаем его на сцене
-					}
-					break;
-				case 39 :
-					if (canFit(tRow, tCol + 1, currentRotation)) 
-					{
-						tCol++;
-						placeTetromino();
-					}
-					break;
-				case 40 :
-					if (canFit(tRow + 1, tCol, currentRotation)) 
-					{
-						tRow++;
-						placeTetromino();
-					}
-					else						// если вниз больше двигаться некуда 
-					{
-						landTetromino();		// считаем тетромино посаженным
-						generateTetromino();	// генерируем новый тетромино
-					}
-					break;
+				switch (event.keyCode) 
+				{
+					case 37 :
+						if (canFit(tRow, tCol - 1, currentRotation))	// проверяем, может ли тетромино поместиться в заданное положение или нет 
+						{
+							tCol--;
+							placeTetromino();
+						}
+						break;
+					case 38 :
+						var ct: uint = currentRotation;
+						var rot: uint = (ct + 1) % tetrominoes[currentTetromino].length;	// вращение тетромино
+						
+						// проверяем текущую позицию при вращении, нарушает ли она границы
+						if (canFit(tRow, tCol, rot)) 
+						{
+							currentRotation = rot;		// если все ок, принимает текущее вращение
+							removeChild(tetromino);		// текущее тетромино удаляем
+							drawTetromino();			// рисуем тетромино в новом вращении, которое приняли
+							placeTetromino();			// размещаем его на сцене
+						}
+						break;
+					case 39 :
+						if (canFit(tRow, tCol + 1, currentRotation)) 
+						{
+							tCol++;
+							placeTetromino();
+						}
+						break;
+					case 40 :
+						if (canFit(tRow + 1, tCol, currentRotation)) 
+						{
+							tRow++;
+							placeTetromino();
+						}
+						else						// если вниз больше двигаться некуда 
+						{
+							landTetromino();		// считаем тетромино посаженным
+							generateTetromino();	// генерируем новый тетромино
+						}
+						break;
 				
-				//case 38 :
-					//if (canFit(tRow - 1, tCol)) 
-					//{
-						//tRow--;
-						//placeTetromino();
-					//}
-					//break;
+					//case 38 :
+						//if (canFit(tRow - 1, tCol)) 
+						//{
+							//tRow--;
+							//placeTetromino();
+						//}
+						//break;
+				}
 			}
 		}
 		
@@ -103,6 +110,8 @@ package {
 				}	
 			}
 			removeChild(tetromino);				// обновляем массив
+			timeCount.removeEventListener(TimerEvent.TIMER, onTime);
+			timeCount.stop();
 			checkForLines();					// проверяем завершенные линии
 		}
 		
@@ -179,13 +188,75 @@ package {
 			return true;
 		}
 		
+		// когда пришло время генерировать текущее тетромино, присваиваем ему значение следующего и создаем следующее случайное тетромино
 		private function generateTetromino():void				// генерируем случайное тетромино на поле
 		{
-			currentTetromino = Math.floor(Math.random() * 7);  	// генерируем случайное целое число от 0 до 6 (возможные тетромино)
-			currentRotation = 0;	// начальное вращение
-			tRow = 0;				// начальный ряд
-			tCol = 3;				// всегда 3, потому что тетромино включены в массив из 4 элементов, поэтому, чтобы центрировать его в поле шириной 10 колонок, его начало должно быть в (10-4) / 2 = 3
-			drawTetromino();		// рисуем тетромино
+			if (! gameOver)
+			{
+				currentTetromino = nextTetromino;
+				nextTetromino = Math.floor(Math.random() * 7);
+				drawNext();
+				//currentTetromino = Math.floor(Math.random() * 7);  	// генерируем случайное целое число от 0 до 6 (возможные тетромино)
+				currentRotation = 0;	// начальное вращение
+				tRow = 0;				// начальный ряд
+				
+				if (tetrominoes[currentTetromino][0][0].indexOf(1) == -1) 
+				{
+					tRow = -1;
+				}
+				
+				tCol = 3;				// всегда 3, потому что тетромино включены в массив из 4 элементов, поэтому, чтобы центрировать его в поле шириной 10 колонок, его начало должно быть в (10-4) / 2 = 3
+				drawTetromino();		// рисуем тетромино
+				
+				if (canFit(tRow, tCol, currentRotation)) 
+				{
+					timeCount.addEventListener(TimerEvent.TIMER, onTime);
+					timeCount.start();
+				}
+				else
+				{
+					gameOver=true;
+				}
+			}
+		}
+		
+		private function drawNext():void			// рисуемт следующее тетромино таким же образом, как drawTetromino
+		{
+			if (getChildByName("next") != null) 
+			{
+				removeChild(getChildByName("next"));
+			}
+			var next_t: Sprite = new Sprite  ;
+			next_t.x = 300;
+			next_t.name = "next";
+			addChild(next_t);
+			next_t.graphics.lineStyle(0, 0x000000);
+			
+			for (var i: int = 0; i < tetrominoes[nextTetromino][0].length; i++) 
+			{
+				for (var j: int = 0; j < tetrominoes[nextTetromino][0][i].length; j++) 
+				{
+					if (tetrominoes[nextTetromino][0][i][j] == 1) 
+					{
+						next_t.graphics.beginFill(colors[nextTetromino]);
+						next_t.graphics.drawRect(TS * j, TS * i, TS, TS);
+						next_t.graphics.endFill();
+					}
+				}
+			}
+		}
+		
+		private function onTime(event:TimerEvent):void			// опускаем тетрамино вниз по таймеру
+		{
+			if (canFit(tRow + 1, tCol, currentRotation)) 
+			{
+				tRow++;
+				placeTetromino();
+			} else 
+			{
+				landTetromino();
+				generateTetromino();
+			}
 		}
 		
 		private function drawTetromino():void					// рисуем тетромино
