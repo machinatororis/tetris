@@ -1,4 +1,6 @@
 package {
+	import flash.display.Bitmap;
+	import flash.display.DisplayObject;
 	import flash.display.Sprite;
 	import flash.events.KeyboardEvent;
 	import flash.events.TimerEvent;
@@ -6,6 +8,9 @@ package {
 	
 	public class Main extends Sprite 
 	{
+		[Embed(source="img/tetris.jpg")] private const Picture: Class;
+		private var WIDTH: int = stage.stageWidth;		// ширина сцены
+		private var HEIGHT: int = stage.stageHeight;	// высота сцены
 		private const TS: uint = 24;					// высота и ширина ячейки поля в пикселях
 		private var fieldArray: Array;					// массив, который будет численно представлять игровое поле
 		private var fieldSprite: Sprite;				// DisplayObject, который графически отобразит игровое поле.
@@ -19,9 +24,10 @@ package {
 		private var tCol: int;							// горизонтальное положение тетромино
 		private var timeCount: Timer = new Timer(500);	// будет запускать слушатель событий каждые 500 миллисекунд
 		private var gameOver: Boolean = false;			// игра окончена или нет
-		
+
 		public function Main() 
 		{
+			generateBackground();				// рисуем bg
 			generateField();   					// рисуем поле
 			initTetrominoes();					// инициализируем массивы, связанные с тетромино
 			nextTetromino = Math.floor(Math.random() * 7); // генерируем следующее тетромино
@@ -50,7 +56,7 @@ package {
 						if (canFit(tRow, tCol, rot)) 
 						{
 							currentRotation = rot;		// если все ок, принимает текущее вращение
-							removeChild(tetromino);		// текущее тетромино удаляем
+							fieldSprite.removeChild(tetromino);		// текущее тетромино удаляем
 							drawTetromino();			// рисуем тетромино в новом вращении, которое приняли
 							placeTetromino();			// размещаем его на сцене
 						}
@@ -99,7 +105,7 @@ package {
 					if (tetrominoes[ct][currentRotation][i][j] == 1)		// если нашли, то рисуем ее 
 					{
 						landed = new Sprite;
-						addChild(landed);
+						fieldSprite.addChild(landed);
 						landed.graphics.lineStyle(0, 0x000000);
 						landed.graphics.beginFill(colors[currentTetromino]);
 						landed.graphics.drawRect(TS * (tCol + j), TS * (tRow + i), TS, TS);
@@ -109,7 +115,7 @@ package {
 					}
 				}	
 			}
-			removeChild(tetromino);				// обновляем массив
+			fieldSprite.removeChild(tetromino);				// обновляем массив
 			timeCount.removeEventListener(TimerEvent.TIMER, onTime);
 			timeCount.stop();
 			checkForLines();					// проверяем завершенные линии
@@ -124,7 +130,7 @@ package {
 					for (var j: int = 0; j < 10; j++) 			// если строка завершена, перебираем все ее десять столбцов, чтобы удалить
 					{
 						fieldArray[i][j] = 0;					// очищаем ячейки 
-						removeChild(getChildByName("r" + i + "c" + j));	// удаляем соответствующий DisplayObject, определяем его по названию.
+						fieldSprite.removeChild(fieldSprite.getChildByName("r" + i + "c" + j));	// удаляем соответствующий DisplayObject, определяем его по названию.
 					}
 					
 					// ищем все строки, выше удаленной строки i. Сместим их на одну вниз
@@ -136,8 +142,8 @@ package {
 							{
 								fieldArray[j][k] = 0;			// устанавливаем k-й столбец j-й строки в 0
 								fieldArray[j+1][k] = 1;			// устанавливаем k-й столбец (j+1)-й строки в 1. Таким образом мы перемещаемся по всей строке
-								getChildByName("r" + j + "c" + k).y += TS;						// перемещаем соответствующий DisplayObject по TS ячейкам поля
-								getChildByName("r" + j + "c" + k).name = "r" + (j + 1) + "c" + k;	// изменяем соответствующее имя DisplayObject в соответствии с его новой позицией
+								fieldSprite.getChildByName("r" + j + "c" + k).y += TS;						// перемещаем соответствующий DisplayObject по TS ячейкам поля
+								fieldSprite.getChildByName("r" + j + "c" + k).name = "r" + (j + 1) + "c" + k;	// изменяем соответствующее имя DisplayObject в соответствии с его новой позицией
 							}
 						}
 					}
@@ -169,6 +175,11 @@ package {
 						}
 						// нижняя граница
 						if (row + i > 19) 
+						{
+							return false;
+						}
+						// верхняя граница
+						if (row + i < 0) 
 						{
 							return false;
 						}
@@ -220,16 +231,17 @@ package {
 			}
 		}
 		
-		private function drawNext():void			// рисуемт следующее тетромино таким же образом, как drawTetromino
+		private function drawNext():void			// рисуем следующее тетромино таким же образом, как drawTetromino
 		{
-			if (getChildByName("next") != null) 
+			if (fieldSprite.getChildByName("next") != null) 
 			{
-				removeChild(getChildByName("next"));
+				fieldSprite.removeChild(fieldSprite.getChildByName("next"));
 			}
-			var next_t: Sprite = new Sprite  ;
+			var next_t: Sprite = new Sprite;
 			next_t.x = 300;
+			next_t.y = HEIGHT / 4;
 			next_t.name = "next";
-			addChild(next_t);
+			fieldSprite.addChild(next_t);
 			next_t.graphics.lineStyle(0, 0x000000);
 			
 			for (var i: int = 0; i < tetrominoes[nextTetromino][0].length; i++) 
@@ -263,7 +275,7 @@ package {
 		{
 			var ct: uint = currentTetromino;	// укорачиваем имя currentTetromino до ct
 			tetromino = new Sprite;				// создаем объект тетромино
-			addChild(tetromino);				// добавляем на экран
+			fieldSprite.addChild(tetromino);				// добавляем на экран
 			tetromino.graphics.lineStyle(0, 0x000000);
 			
 			// ищем один-й jэлемент в i-ой строке currentRotation-го вращения ct-те тетромино. Если он равен 1, мы должны нарисовать тетромино
@@ -320,12 +332,22 @@ package {
 			
 		}
 		
+		private function generateBackground():void	// функция отрисовки bg
+		{
+			var pic: Bitmap = new Picture() as Bitmap;
+			pic.x = ((WIDTH / 2) - (2560 / 2));		// 2560 - магические пиксели размера картинки
+			pic.y = ((HEIGHT / 2) - (1600 / 2));
+			addChild(pic);
+		}
+		
 		private function generateField():void	// функция отрисовки поля
 		{
 			var colors: Array = new Array("0x444444", "0x555555");
 			fieldArray = new Array;
-			var fieldSprite: Sprite = new Sprite;
+			fieldSprite = new Sprite;
 			addChild(fieldSprite);				// создаем объекты массивов и добавляем на сцену
+			fieldSprite.x = ((WIDTH / 2) - (5 * TS));
+			fieldSprite.y = ((HEIGHT / 2) - (10 * TS));
 			fieldSprite.graphics.lineStyle(0, 0x000000);	// задаем стиль линии: 0 - толщина линии в пикселях, 0x000000 - черный цвет
 			for (var i: uint = 0; i < 20; i++)	// поле игры 20х10 сделать константами! 
 			{
