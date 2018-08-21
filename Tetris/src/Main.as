@@ -2,18 +2,34 @@ package {
 	import flash.display.Bitmap;
 	import flash.display.DisplayObject;
 	import flash.display.Sprite;
+	import flash.events.Event;
 	import flash.events.KeyboardEvent;
+	import flash.events.MouseEvent;
 	import flash.events.TimerEvent;
+	import flash.text.TextField;
+	import flash.text.TextFieldAutoSize;
+	import flash.text.TextFormat;
 	import flash.utils.Timer;
+	
+	import flashx.textLayout.formats.TextAlign;
 	
 	public class Main extends Sprite 
 	{
 		[Embed(source="img/tetris.jpg")] private const Picture: Class;
+		[Embed(source="img/start.png")] private const pictureStart: Class;
+		[Embed(source="img/pause.png")] private const picturePause: Class;
+		[Embed(source="img/replay.png")] private const pictureReplay: Class;
 		private var WIDTH: int = stage.stageWidth;		// ширина сцены
 		private var HEIGHT: int = stage.stageHeight;	// высота сцены
 		private const TS: uint = 24;					// высота и ширина ячейки поля в пикселях
 		private var fieldArray: Array;					// массив, который будет численно представлять игровое поле
-		private var fieldSprite: Sprite;				// DisplayObject, который графически отобразит игровое поле.
+		private var fieldSprite: Sprite;				// DisplayObject, который графически отобразит игровое поле
+		private var interfaceSprite: Sprite;			// спрайт для интерфейсных кнопок
+		private var startSprite: Sprite;				// спрайт кнопки start
+		private var pauseSprite: Sprite;				// спрайт кнопки pause
+		private var replaySprite: Sprite;				// спрайт кнопки replay
+		private var txtPause: TextField = new TextField();
+		private var formatGameMessage: TextFormat = new TextFormat();
 		private var tetrominoes: Array = new Array();  	// четырехмерный массив, содержащий всю информацию о тетромино
 		private var colors: Array = new Array();  		// цвета тетромино
 		private var tetromino: Sprite;					// DisplayObject тетромино
@@ -24,17 +40,38 @@ package {
 		private var tCol: int;							// горизонтальное положение тетромино
 		private var timeCount: Timer = new Timer(500);	// будет запускать слушатель событий каждые 500 миллисекунд
 		private var gameOver: Boolean = false;			// игра окончена или нет
+		private var gamePause: Boolean = false;			// игра на паузе или нет
 
 		public function Main() 
 		{
-			generateBackground();				// рисуем bg
-			generateField();   					// рисуем поле
-			initTetrominoes();					// инициализируем массивы, связанные с тетромино
+			generateBackground();						// рисуем bg
+			generateField();   							// рисуем поле
+			generateInterface();						// рисуем интерфейс
+			initTetrominoes();							// инициализируем массивы, связанные с тетромино
 			nextTetromino = Math.floor(Math.random() * 7); // генерируем следующее тетромино
-			generateTetromino();				// генерируем случайное тетромино на поле
+			generateTetromino();						// генерируем случайное тетромино на поле
 			stage.addEventListener(KeyboardEvent.KEY_DOWN, onKDown);	// слушатель клавиатуры
+			fieldSprite.addEventListener(MouseEvent.CLICK, onMouseClick);		// слушатель мышки
 		}
 		
+		protected function onMouseClick(event:MouseEvent):void
+		{
+			if(! gameOver)
+			{
+				var ct: uint = currentRotation;
+				var rot: uint = (ct + 1) % tetrominoes[currentTetromino].length;	// вращение тетромино
+				
+				// проверяем текущую позицию при вращении, нарушает ли она границы
+				if (canFit(tRow, tCol, rot)) 
+				{
+					currentRotation = rot;		// если все ок, принимает текущее вращение
+					fieldSprite.removeChild(tetromino);		// текущее тетромино удаляем
+					drawTetromino();			// рисуем тетромино в новом вращении, которое приняли
+					placeTetromino();			// размещаем его на сцене
+				}
+			}
+		}
+
 		private function onKDown(event:KeyboardEvent):void
 		{
 			if(! gameOver)
@@ -227,6 +264,7 @@ package {
 				else
 				{
 					gameOver=true;
+					drawGameOver();
 				}
 			}
 		}
@@ -237,9 +275,10 @@ package {
 			{
 				fieldSprite.removeChild(fieldSprite.getChildByName("next"));
 			}
+			
 			var next_t: Sprite = new Sprite;
-			next_t.x = 300;
-			next_t.y = HEIGHT / 4;
+			next_t.x = 270;
+			next_t.y = 70;
 			next_t.name = "next";
 			fieldSprite.addChild(next_t);
 			next_t.graphics.lineStyle(0, 0x000000);
@@ -264,7 +303,9 @@ package {
 			{
 				tRow++;
 				placeTetromino();
-			} else 
+			} 
+			
+			else 
 			{
 				landTetromino();
 				generateTetromino();
@@ -300,7 +341,7 @@ package {
 			tetromino.y = tRow * TS;
 		}
 		
-		private function initTetrominoes():void					// инициализируем массивы, связанные с тетромино
+		private function initTetrominoes():void	// инициализируем массивы, связанные с тетромино
 		{
 			// I
 			tetrominoes[0]=[[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],[[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]]];
@@ -363,6 +404,121 @@ package {
 				}
 			}
 		}
+		
+		private function generateInterface():void
+		{
+			interfaceSprite = new Sprite;
+			addChild(interfaceSprite);				// добавляем на сцену спрайт интерфейса
+			interfaceSprite.x = ((WIDTH / 2) - (5 * TS));
+			interfaceSprite.y = ((HEIGHT / 2) - (10 * TS));
 			
+			// кнопка старт
+			startSprite = new Sprite;
+			interfaceSprite.addChild(startSprite);
+			var start: Bitmap = new pictureStart() as Bitmap;	
+			start.x = 280;
+			start.y = 200;
+			startSprite.addChild(start);
+			startSprite.addEventListener(MouseEvent.CLICK, onStart);
+			
+			// кнопка пауза
+			pauseSprite = new Sprite;
+			interfaceSprite.addChild(pauseSprite);
+			var pause: Bitmap = new picturePause() as Bitmap;	
+			pause.x = 280;
+			pause.y = 300;
+			pauseSprite.addChild(pause);
+			pauseSprite.addEventListener(MouseEvent.CLICK, onPause); // слушатель кнопки пауза
+			
+			// кнопка переиграть
+			replaySprite = new Sprite;
+			interfaceSprite.addChild(replaySprite);
+			var replay: Bitmap = new pictureReplay() as Bitmap;	
+			replay.x = 280;
+			replay.y = 400;
+			replaySprite.addChild(replay);
+			replaySprite.addEventListener(MouseEvent.CLICK, onReplay);
+			
+			var formatNext: TextFormat = new TextFormat();
+			formatNext.font = "Consolas";
+			formatNext.size = 40;
+			formatNext.color = 0x000000;
+			
+			var txtNext: TextField = new TextField();
+			fieldSprite.addChild(txtNext);
+			txtNext.text = "NEXT";
+			txtNext.x = 270;
+			txtNext.y = 10;
+			txtNext.width = 800;
+			txtNext.height = 100;
+			
+			txtNext.setTextFormat(formatNext);
+		}
+		
+		protected function onStart(event:MouseEvent):void	// обработчик событий кнопки старт
+		{
+			if (gamePause)									// если до этого игра была на паузе
+			{
+				gamePause = false;							// снимаем паузу
+				fieldSprite.removeChild(txtPause);
+				timeCount.start();
+			}
+		}
+		
+		protected function onPause(event:MouseEvent):void	// обработчик событий кнопки пауза		
+		{
+			if (! gameOver)
+			{
+				gamePause = true;							// ставим игру на паузу
+				
+				timeCount.stop();
+				
+				fieldSprite.addChild(txtPause);
+				txtPause.background = true;
+				txtPause.backgroundColor = 0x222222;
+				txtPause.text = "PAUSE";
+				txtPause.autoSize = TextAlign.CENTER;
+				txtPause.x = 0;
+				txtPause.y = 200;
+				txtPause.width = 240;
+				txtPause.height = 61;
+				
+				setFormatGameMessage();							// ф-ция задания стиля игровым сообщениям
+				txtPause.setTextFormat(formatGameMessage);
+			}
+		}
+		
+		protected function onReplay(event:MouseEvent):void	// обработчик событий кнопки переиграть
+		{
+			timeCount.stop();
+			fieldSprite.removeChild(fieldSprite.getChildByName("next"));
+			generateField();
+			generateTetromino();						// генерируем случайное тетромино на поле
+			timeCount.start();
+			fieldSprite.addEventListener(MouseEvent.CLICK, onMouseClick);
+		}
+		
+		private function setFormatGameMessage():void		// задаем стиль игровым сообщениям
+		{
+			formatGameMessage.font = "Consolas";
+			formatGameMessage.size = 48;
+			formatGameMessage.color = 0xffffff;
+		}
+		
+		private function drawGameOver():void				// функция отрисовки сообщения о завершении игры
+		{
+			setFormatGameMessage();							// ф-ция задания стиля игровым сообщениям
+			var txtGameOver: TextField = new TextField();
+			fieldSprite.addChild(txtGameOver);
+			txtGameOver.background = true;
+			txtGameOver.backgroundColor = 0x222222;
+			txtGameOver.text = "GAME OVER";
+			txtGameOver.x = 0;
+			txtGameOver.y = 200;
+			txtGameOver.width = 240;
+			txtGameOver.height = 61;
+			
+			txtGameOver.setTextFormat(formatGameMessage);
+		}	
 	}
 }
