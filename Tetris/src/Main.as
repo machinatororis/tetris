@@ -1,7 +1,10 @@
 package {
 	import flash.display.Bitmap;
+	import flash.display.BlendMode;
 	import flash.display.DisplayObject;
 	import flash.display.Sprite;
+	import flash.display.StageAlign;
+	import flash.display.StageScaleMode;
 	import flash.events.Event;
 	import flash.events.KeyboardEvent;
 	import flash.events.MouseEvent;
@@ -9,9 +12,10 @@ package {
 	import flash.text.TextField;
 	import flash.text.TextFieldAutoSize;
 	import flash.text.TextFormat;
+	import flash.utils.*;
 	import flash.utils.Timer;
 	
-	import flashx.textLayout.formats.TextAlign;
+	//import flashx.textLayout.formats.TextAlign;
 	
 	public class Main extends Sprite 
 	{
@@ -19,10 +23,14 @@ package {
 		[Embed(source="img/start.png")] private const pictureStart: Class;
 		[Embed(source="img/pause.png")] private const picturePause: Class;
 		[Embed(source="img/replay.png")] private const pictureReplay: Class;
+		private var baseWidth:Number = 800;
+		private var baseHeight:Number = 600;
 		private var WIDTH: int = stage.stageWidth;		// ширина сцены
 		private var HEIGHT: int = stage.stageHeight;	// высота сцены
 		private const TS: uint = 24;					// высота и ширина ячейки поля в пикселях
 		private var fieldArray: Array;					// массив, который будет численно представлять игровое поле
+		private var commonSprite: Sprite;
+		private var bgSprite: Sprite;
 		private var fieldSprite: Sprite;				// DisplayObject, который графически отобразит игровое поле
 		private var interfaceSprite: Sprite;			// спрайт для интерфейсных кнопок
 		private var startSprite: Sprite;				// спрайт кнопки start
@@ -41,9 +49,21 @@ package {
 		private var timeCount: Timer = new Timer(500);	// будет запускать слушатель событий каждые 500 миллисекунд
 		private var gameOver: Boolean = false;			// игра окончена или нет
 		private var gamePause: Boolean = false;			// игра на паузе или нет
+		
+		private var upMouseX: Number;				// координаты нажатия мыши
+		private var upMouseY: Number;				// координаты нажатия мыши
+		private var downMouseX: Number;					// координаты отжатия мыши
+		private var downMouseY: Number;					// координаты отжатия мыши
 
 		public function Main() 
 		{
+			stage.scaleMode = StageScaleMode.NO_SCALE;
+			stage.align = StageAlign.TOP_LEFT;
+			bgSprite = new Sprite();
+			addChild(bgSprite);
+			commonSprite = new Sprite();
+			addChild(commonSprite);
+			stage.addEventListener(Event.RESIZE, onResize);
 			generateBackground();						// рисуем bg
 			generateField();   							// рисуем поле
 			generateInterface();						// рисуем интерфейс
@@ -51,25 +71,95 @@ package {
 			nextTetromino = Math.floor(Math.random() * 7); // генерируем следующее тетромино
 			generateTetromino();						// генерируем случайное тетромино на поле
 			stage.addEventListener(KeyboardEvent.KEY_DOWN, onKDown);	// слушатель клавиатуры
-			fieldSprite.addEventListener(MouseEvent.CLICK, onMouseClick);		// слушатель мышки
+			fieldSprite.addEventListener(MouseEvent.MOUSE_UP, onMouseUp);		// слушатель мышки
+			fieldSprite.addEventListener(MouseEvent.MOUSE_DOWN, onMouseDown);
 		}
 		
-		protected function onMouseClick(event:MouseEvent):void
+		protected function onResize(event:Event):void
 		{
-			if(! gameOver)
-			{
-				var ct: uint = currentRotation;
-				var rot: uint = (ct + 1) % tetrominoes[currentTetromino].length;	// вращение тетромино
-				
-				// проверяем текущую позицию при вращении, нарушает ли она границы
-				if (canFit(tRow, tCol, rot)) 
-				{
-					currentRotation = rot;		// если все ок, принимает текущее вращение
-					fieldSprite.removeChild(tetromino);		// текущее тетромино удаляем
-					drawTetromino();			// рисуем тетромино в новом вращении, которое приняли
-					placeTetromino();			// размещаем его на сцене
-				}
+			var realWidth:Number = stage.stageWidth;
+			var realHeight:Number = stage.stageHeight;
+			var sx:Number = realWidth / this.baseWidth;
+			var sy:Number = realHeight / this.baseHeight;
+			trace("resize");
+			
+			if (baseWidth / baseHeight >= realWidth / realHeight)
+			{//landscape
+				commonSprite.scaleX = commonSprite.scaleY = sx;
+				bgSprite.scaleX = sx;
+				bgSprite.scaleY = sy;
+				commonSprite.x = Math.floor((realWidth - this.baseWidth * sx) / 2);
+				commonSprite.y = Math.floor((realHeight - this.baseHeight * sx) / 2);
 			}
+			else 
+			{//portrait
+				commonSprite.scaleX = commonSprite.scaleY = sy;
+				bgSprite.scaleX = sx;
+				bgSprite.scaleY = sy;
+				commonSprite.x = Math.floor((realWidth - this.baseWidth * sy) / 2);
+				commonSprite.y = Math.floor((realHeight - this.baseHeight * sy) / 2);
+			}
+		}
+		
+		protected function onMouseUp(event:MouseEvent):void
+		{
+			if(gameOver) return;
+			
+				upMouseX = event.localX;
+				upMouseY = event.localY;				// запомнили координаты отжатия мышки
+				
+				if((upMouseX - downMouseX) >= 10)		// двигаемся вправо
+				{
+					if (canFit(tRow, tCol + 1, currentRotation)) 
+					{
+						tCol++;
+						placeTetromino();
+						trace("tCol++");
+						return;
+					}
+				}
+				
+				if((upMouseX - downMouseX) <= (-10))	// двигаемся влево
+				{
+					if (canFit(tRow, tCol - 1, currentRotation))	// проверяем, может ли тетромино поместиться в заданное положение или нет 
+					{
+						tCol--;
+						placeTetromino();
+						trace("tCol--");
+						return;
+					}
+				}
+			
+				if((upMouseY - downMouseY) >= 10)		// двигаемся вниз
+				{
+					if (canFit(tRow + 1, tCol, currentRotation)) 
+					{
+						tRow++;
+						placeTetromino();
+						return;
+					}	
+				}
+				
+				
+					var ct: uint = currentRotation;
+					var rot: uint = (ct + 1) % tetrominoes[currentTetromino].length;	// вращение тетромино
+					
+					// проверяем текущую позицию при вращении, нарушает ли она границы
+					if (canFit(tRow, tCol, rot)) 
+					{
+						currentRotation = rot;		// если все ок, принимает текущее вращение
+						fieldSprite.removeChild(tetromino);		// текущее тетромино удаляем
+						drawTetromino();			// рисуем тетромино в новом вращении, которое приняли
+						placeTetromino();			// размещаем его на сцене
+					}
+				
+			
+		}
+		
+		protected function onMouseDown(event:MouseEvent):void
+		{
+			downMouseX = event.localX;
+			downMouseY = event.localY;				// запомнили координаты нажатия мышки
 		}
 
 		private function onKDown(event:KeyboardEvent):void
@@ -315,7 +405,7 @@ package {
 		private function drawTetromino():void					// рисуем тетромино
 		{
 			var ct: uint = currentTetromino;	// укорачиваем имя currentTetromino до ct
-			tetromino = new Sprite;				// создаем объект тетромино
+			tetromino = new Sprite();				// создаем объект тетромино
 			fieldSprite.addChild(tetromino);				// добавляем на экран
 			tetromino.graphics.lineStyle(0, 0x000000);
 			
@@ -376,17 +466,17 @@ package {
 		private function generateBackground():void	// функция отрисовки bg
 		{
 			var pic: Bitmap = new Picture() as Bitmap;
-			pic.x = ((WIDTH / 2) - (2560 / 2));		// 2560 - магические пиксели размера картинки
-			pic.y = ((HEIGHT / 2) - (1600 / 2));
-			addChild(pic);
+			pic.x = ((WIDTH / 2) - (pic.width / 2));		// 2560 - магические пиксели размера картинки
+			pic.y = ((HEIGHT / 2) - (pic.height / 2));
+			bgSprite.addChild(pic);
 		}
 		
 		private function generateField():void	// функция отрисовки поля
 		{
 			var colors: Array = new Array("0x444444", "0x555555");
-			fieldArray = new Array;
-			fieldSprite = new Sprite;
-			addChild(fieldSprite);				// создаем объекты массивов и добавляем на сцену
+			fieldArray = new Array();
+			fieldSprite = new Sprite();
+			commonSprite.addChild(fieldSprite);				// создаем объекты массивов и добавляем на сцену
 			fieldSprite.x = ((WIDTH / 2) - (5 * TS));
 			fieldSprite.y = ((HEIGHT / 2) - (10 * TS));
 			fieldSprite.graphics.lineStyle(0, 0x000000);	// задаем стиль линии: 0 - толщина линии в пикселях, 0x000000 - черный цвет
@@ -408,7 +498,7 @@ package {
 		private function generateInterface():void
 		{
 			interfaceSprite = new Sprite;
-			addChild(interfaceSprite);				// добавляем на сцену спрайт интерфейса
+			commonSprite.addChild(interfaceSprite);				// добавляем на сцену спрайт интерфейса
 			interfaceSprite.x = ((WIDTH / 2) - (5 * TS));
 			interfaceSprite.y = ((HEIGHT / 2) - (10 * TS));
 			
@@ -477,7 +567,7 @@ package {
 				txtPause.background = true;
 				txtPause.backgroundColor = 0x222222;
 				txtPause.text = "PAUSE";
-				txtPause.autoSize = TextAlign.CENTER;
+				txtPause.autoSize = TextFieldAutoSize.CENTER;
 				txtPause.x = 0;
 				txtPause.y = 200;
 				txtPause.width = 240;
@@ -490,12 +580,14 @@ package {
 		
 		protected function onReplay(event:MouseEvent):void	// обработчик событий кнопки переиграть
 		{
+			gameOver = false;
 			timeCount.stop();
 			fieldSprite.removeChild(fieldSprite.getChildByName("next"));
 			generateField();
 			generateTetromino();						// генерируем случайное тетромино на поле
 			timeCount.start();
-			fieldSprite.addEventListener(MouseEvent.CLICK, onMouseClick);
+			fieldSprite.addEventListener(MouseEvent.MOUSE_UP, onMouseUp);		// слушатель мышки
+			fieldSprite.addEventListener(MouseEvent.MOUSE_DOWN, onMouseDown);
 		}
 		
 		private function setFormatGameMessage():void		// задаем стиль игровым сообщениям

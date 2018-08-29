@@ -1,0 +1,22 @@
+﻿<html>
+	<head>
+		<script src="Tetris.js"></script>
+	</head>
+	<body style="margin:0; overflow:hidden">
+		<script>
+			createProject({
+				parent: document.body,			// append stage body to
+				autoSize: 100,					// auto size with interval
+				skipping: true,					// frame skipping
+				panel: {						// system panel
+				    align: 'right',				// left / right
+					buttons: ["displayState","sound"]		// buttons
+				},
+				mobile: {
+					orientation: 'landscape',	// stage orientation (portrait, landscape, auto)
+					maximize: true				// fill the whole screen
+				}
+			}, '');
+		</script>
+	</body>
+</html>
